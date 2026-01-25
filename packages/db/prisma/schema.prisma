@@ -1,0 +1,366 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User{
+  id String @id @default(uuid())
+  name String
+  email String @unique
+  password String
+  admin Boolean @default(false)
+  country String?
+
+  credits Int @default(0)
+  totalOrders Int @default(0)
+  totalSpend   Decimal  @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  orders Order[] @relation("Order-User")
+  creditsLedger CreditsLedger[] @relation("CreditsLedger-User")
+  promotionUsages PromotionUsage[] @relation("User-PromotionUsage")
+
+  @@index([email])
+}
+
+model Plans{
+  id String @id @default(uuid())
+  name String
+  description String
+  features Json
+  isActive Boolean @default(true)
+
+  credits Int
+  priceUSD Decimal
+  priceINR Decimal
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  orders Order[] @relation("Order-Plans")
+
+}
+
+model Promotions{
+  id String @id @default(uuid())
+  name String
+  type PromotionType
+  category PromotionCategory @default(NORMAL)  // used for stacking logic
+  isActive Boolean
+
+  priority Int
+  exclusive Boolean
+  isStackable Boolean
+
+  startAt DateTime
+  endAt DateTime
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  rules PromotionRules[] @relation("Promotions-PromotionRules")
+  effects PromotionEffects[] @relation("Promotions-PromotionEffects")
+  coupons CouponCode[] @relation("Promotions-CouponCode")
+  promotionUsages PromotionUsage[] @relation("Promotions-PromotionUsage")
+
+  @@index([isActive, startAt, endAt])
+}
+
+model PromotionRules{
+  id String @id @default(uuid())
+  promotionId String
+
+  ruleType RuleType
+  operator String
+  value Json
+
+  promotions Promotions @relation("Promotions-PromotionRules" , fields: [promotionId] , references: [id] , onDelete: Cascade)
+
+  @@index([promotionId])
+
+}
+
+model PromotionEffects{
+  id String @id @default(uuid())
+  promotionId String
+  effectType EffectType
+  value Decimal
+  maxDiscount Decimal?
+
+  promotions Promotions @relation("Promotions-PromotionEffects" , fields: [promotionId] , references: [id] , onDelete: Cascade)
+
+  @@index([promotionId])
+
+}
+
+model CouponCode {
+  id String @id @default(uuid())
+  promotionId String
+  code String @unique
+  maxUses Int
+  perUserLimit Int
+
+  isPublic Boolean @default(true)
+
+  promotions Promotions @relation("Promotions-CouponCode" , fields: [promotionId] , references: [id] , onDelete: Cascade) 
+  
+
+  @@index([code])
+}
+
+model PromotionUsage{
+  id String @id @default(uuid())
+  promotionId String
+  userId String
+  orderId String
+  status CouponUsageStatus
+  usedAt DateTime @default(now())
+  appliedPromos Json
+
+  promotion Promotions @relation("Promotions-PromotionUsage", fields: [promotionId], references: [id])
+  user User @relation("User-PromotionUsage", fields: [userId], references: [id])
+  order Order @relation("PromotionUsage-Order",fields: [orderId], references: [id])
+
+  @@unique([promotionId,orderId,userId])
+  @@index([promotionId])
+  @@index([userId])
+  @@index([status])
+}
+
+model Order{
+  id String @id @default(uuid())
+  userId String
+  planId String
+  
+  gateway PaymentGateway
+  gatewayOrderId String @unique // given by pg
+  
+  baseAmount Decimal
+  discountTotal Decimal
+  finalAmount Decimal
+  currency Currency
+
+  appliedPromos Json
+  
+  status OrderStatus
+
+  failureReason String? // from pg
+  metaData Json? // from pg
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation("Order-User" , fields: [userId] , references: [id])
+  plan Plans @relation("Order-Plans" , fields: [planId] ,references: [id])
+  payments Payment[] @relation("Payment-Order")
+  refund Refund[] @relation("Refund-Order")
+  promotionUsage PromotionUsage[] @relation("PromotionUsage-Order")
+
+}
+
+model Payment{
+  id String @id @default(uuid())
+  orderId String
+
+  gateway PaymentGateway
+  gatewayPaymentId String @unique
+
+  status PaymentStatus
+  rawPayload Json
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  order Order @relation("Payment-Order" , fields: [orderId] , references: [id])
+  refund Refund[] @relation("Refund-Payment")
+}
+
+model Refund {
+  id String @id @default(uuid())
+  orderId String
+  paymentId String
+
+  gateway PaymentGateway
+  gatewayRefundId String? // given by pg
+
+  amount Decimal
+  currency Currency
+
+  status RefundStatus
+  reason String?
+  initiatedBy RefundSource
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  order Order @relation("Refund-Order",fields: [orderId], references: [id])
+  payment Payment @relation("Refund-Payment",fields: [paymentId], references: [id])
+
+  @@index([orderId])
+  @@index([paymentId])
+  @@index([status])
+}
+
+model CreditsLedger{
+  id String @id @default(uuid())
+  userId String
+
+  change Int
+  balanceAfter Int
+
+  reason LedgerReason
+  referenceId String
+  referenceType LedgerReferenceType
+
+  createdAt DateTime @default(now())
+
+  user User @relation("CreditsLedger-User" , fields: [userId] , references: [id])
+
+  @@index([userId,createdAt])
+  @@index([userId])
+  @@index([userId,referenceType])
+  @@index([referenceId])
+}
+
+model WebhookEvents{
+  id String @id @default(uuid())
+
+  eventId String @unique //given by pg
+  gateway PaymentGateway
+
+  type String
+  payload Json
+
+  processed Boolean @default(false)
+  processedAt DateTime?
+  errorMessage String?
+  createdAt DateTime @default(now())
+
+  @@index([processed])
+  @@index([gateway, processed])
+
+}
+
+model EmailLog{
+  id String @id @default(uuid())
+  userId String?
+  
+  entityType EmailEntityType
+  entityId String
+
+  emailType EmailType
+  sentAt DateTime @default(now())
+
+  @@unique([entityType, entityId, emailType])
+  @@index([userId])
+
+}
+
+enum PromotionType {
+  AUTO
+  COUPON
+  TARGETED
+  LOYALTY
+}
+
+enum PromotionCategory {
+  NORMAL
+  USER_SPECIFIC
+}
+
+enum RuleType {
+  MIN_ORDER_VALUE
+  FIRST_PURCHASE
+  MAX_USER_ORDERS
+  PLAN_IN
+  USER_IN
+  COUNTRY_IN
+}
+
+enum EffectType {
+  PERCENT_DISCOUNT
+  FLAT_DISCOUNT
+  BONUS_CREDITS
+}
+
+enum CouponUsageStatus {
+  RESERVED
+  CONSUMED
+  RELEASED
+}
+
+enum PaymentGateway {
+  RAZORPAY
+  STRIPE
+  PAYPAL
+}
+
+enum OrderStatus {
+  CREATED
+  PAID
+  FAILED
+  EXPIRED
+}
+
+enum PaymentStatus {
+  SUCCESS
+  FAILED
+}
+
+enum LedgerReason {
+  PURCHASE
+  SPEND
+  REFUND
+  ADMIN
+}
+
+enum LedgerReferenceType {
+  ORDER
+  PAYMENT
+  REFUND
+  ADMIN_ACTION
+}
+
+enum Currency {
+  USD
+  INR
+}
+
+enum EmailEntityType {
+  ORDER
+  PROMOTION
+  REFUND
+  WALLET
+}
+
+enum EmailType {
+  PAYMENT_SUCCESS
+  INVOICE
+  PROMOTION_OFFER
+  REFUND_PROCESSED
+  WALLET_TOPUP
+}
+
+enum RefundStatus {
+  INITIATED
+  PROCESSING
+  SUCCESS
+  FAILED
+}
+
+enum RefundSource {
+  ADMIN
+  SYSTEM
+  GATEWAY
+}

@@ -1,0 +1,19 @@
+{
+  "name": "http",
+  "module": "index.ts",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "build" : "tsc -b",
+    "start" : "bun run ./dist/index.js",
+    "dev" : "bun run build && bun run start"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "@repo/typescript-config": "*",
+    "@repo/db": "*"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  }
+}
