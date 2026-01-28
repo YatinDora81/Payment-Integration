@@ -1,0 +1,1 @@
+export * from './schema/promotions.schema.js'

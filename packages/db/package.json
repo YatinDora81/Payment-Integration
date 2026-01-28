@@ -7,7 +7,7 @@
     "build": "tsc -b"
   },
   "exports": {
-    "./db": "./src/index.ts"
+    "./db": "./dist/index.js"
   },
   "devDependencies": {
     "@repo/typescript-config": "*",

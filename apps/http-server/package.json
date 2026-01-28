@@ -4,16 +4,27 @@
   "type": "module",
   "private": true,
   "scripts": {
-    "build" : "tsc -b",
-    "start" : "bun run ./dist/index.js",
-    "dev" : "bun run build && bun run start"
+    "build": "tsc -b && bun exec tsc-alias -p tsconfig.json",
+    "start": "bun run ./dist/bin.js",
+    "dev": "bun run build && bun run start"
   },
   "devDependencies": {
-    "@types/bun": "latest",
+    "@repo/db": "*",
     "@repo/typescript-config": "*",
-    "@repo/db": "*"
+    "@repo/types": "*",
+    "@types/bun": "latest",
+    "tsc-alias": "^1.8.16"
   },
   "peerDependencies": {
     "typescript": "^5"
+  },
+  "dependencies": {
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.6",
+    "cors": "^2.8.6",
+    "dotenv": "^17.2.3",
+    "express": "^5.2.1",
+    "uuid": "^13.0.0",
+    "zod": "^4.3.6"
   }
 }
