@@ -35,6 +35,30 @@ model User{
   @@index([email])
 }
 
+enum GatewayStatus {
+  UP
+  DEGRADED
+  DOWN
+}
+
+
+model PaymentGatewayConfig {
+  id String @id @default(uuid())
+  gateway PaymentGateway
+  enabled Boolean @default(true) // for admin kill switch
+  weight Int @default(1)
+  status GatewayStatus @default(UP)
+  lastFailureRate Float? // 0 - 1.0
+  lastEvaluatedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([enabled])
+  @@index([status])
+  @@index([gateway])
+}
+
 model Plans{
   id String @id @default(uuid())
   name String
@@ -51,6 +75,18 @@ model Plans{
 
   orders Order[] @relation("Order-Plans")
 
+}
+
+enum PromotionType {
+  AUTO
+  COUPON
+  TARGETED
+  LOYALTY
+}
+
+enum PromotionCategory {
+  NORMAL
+  USER_SPECIFIC
 }
 
 model Promotions{
@@ -78,6 +114,15 @@ model Promotions{
   @@index([isActive, startAt, endAt])
 }
 
+enum RuleType {
+  MIN_ORDER_VALUE
+  FIRST_PURCHASE
+  MAX_USER_ORDERS
+  PLAN_IN
+  USER_IN
+  COUNTRY_IN
+}
+
 model PromotionRules{
   id String @id @default(uuid())
   promotionId String
@@ -90,6 +135,12 @@ model PromotionRules{
 
   @@index([promotionId])
 
+}
+
+enum EffectType {
+  PERCENT_DISCOUNT
+  FLAT_DISCOUNT
+  BONUS_CREDITS
 }
 
 model PromotionEffects{
@@ -118,6 +169,12 @@ model CouponCode {
   
 
   @@index([code])
+}
+
+enum CouponUsageStatus {
+  RESERVED
+  CONSUMED
+  RELEASED
 }
 
 model PromotionUsage{
@@ -267,38 +324,6 @@ model EmailLog{
 
 }
 
-enum PromotionType {
-  AUTO
-  COUPON
-  TARGETED
-  LOYALTY
-}
-
-enum PromotionCategory {
-  NORMAL
-  USER_SPECIFIC
-}
-
-enum RuleType {
-  MIN_ORDER_VALUE
-  FIRST_PURCHASE
-  MAX_USER_ORDERS
-  PLAN_IN
-  USER_IN
-  COUNTRY_IN
-}
-
-enum EffectType {
-  PERCENT_DISCOUNT
-  FLAT_DISCOUNT
-  BONUS_CREDITS
-}
-
-enum CouponUsageStatus {
-  RESERVED
-  CONSUMED
-  RELEASED
-}
 
 enum PaymentGateway {
   RAZORPAY
